@@ -1,19 +1,3 @@
-// RoomClimateLogger,  log the climate of all your rooms in a central database.
-// Copyright (C) 2020  Ralf Stemmer <ralf.stemmer@gmx.net>
-// 
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 
@@ -34,7 +18,10 @@ IPAddress subnet(255,255,255,0);                    // /
 const unsigned long interval = 60000; // send data every 60 seconds
 
 Adafruit_BME280 bme;
+const uint8_t bmeaddress = BME280_ADDRESS_ALTERNATE; // or BME280_ADDRESS 
 
+#define ENABLE_GRAVELIGHT     // Comment for better debugging
+#define ENABLE_PRINTDATA      // Uncomment for better debuging
 
 
 void WiFiConnect()
@@ -68,6 +55,7 @@ void WiFiConnect()
     while(true)
     {
         // LED on
+        #ifdef ENABLE_GRAVELIGHT
         toggletime = millis() + interval;
         do
         {
@@ -75,6 +63,7 @@ void WiFiConnect()
             delay(10); // Give the LED an eerie flicker.
         }
         while(millis() < toggletime);
+        #endif
 
         // LED off
         delay(500);
@@ -90,11 +79,14 @@ void setup()
     while(!Serial);
 
     // Setup WiFi
+    // This feature does not work with ESP32
+    #if 0
     if(WiFi.status() == WL_NO_SHIELD)
     {
         Serial.println("No WiFi hardware!");
         GraveLight(); // no return
     }
+    #endif
     
     auto success = WiFi.config(myipaddr, gateway, subnet);
     if(not success)
@@ -107,7 +99,7 @@ void setup()
 
     // Setup Sensors
     bool sensorready;
-    sensorready = bme.begin();
+    sensorready = bme.begin(bmeaddress);
     if(not sensorready)
     {
         Serial.println("Sensor setup failed!");
@@ -154,7 +146,7 @@ void loop()
         delay(1000);  // Wait a second for the next sample     
         timestamp = millis();
     }
-    while(timestamp < deadline and (deadline^timestamp) & msbmask);
+    while(timestamp < deadline or (deadline^timestamp) & msbmask);
     
     // Calculate average temperature and humidity
     //  observed during the last measurement interval
@@ -167,6 +159,9 @@ void loop()
     postdata =  "r=" + String(roomname)
              + "&t=" + String(temp)
              + "&h=" + String(hum);
+#ifdef ENABLE_PRINTDATA
+    Serial.println(postdata);
+#endif
     
     // Send Data
     HTTPClient http;
